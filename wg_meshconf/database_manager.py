@@ -345,8 +345,27 @@ class DatabaseManager:
             with (output / f"{peer}.conf").open("w") as config:
                 config.write("[Interface]\n")
                 config.write("# Name: {}\n".format(peer))
-                config.write("Address = {}\n".format(", ".join(local_peer["Address"])))
+               # config.write("Address = {}\n".format(", ".join(local_peer["Address"])))
                 config.write("PrivateKey = {}\n".format(local_peer["PrivateKey"]))
+
+                config.write("PostUp = ip link add name grebridge0 type bridge\n")
+                config.write("PostUp = ip link set grebridge0 up\n")
+
+
+                for p in [i for i in database["peers"] if i != peer]:
+                    remote_peer = database["peers"][p]
+                    config.write("PostUp = ip link add name gre{}0 type ip6gretap local {} remote {} dev %i \n".format(
+                            p,
+                            local_peer["Address"][0],
+                            remote_peer["Address"][0]))
+                    config.write("PostUp = ip link set gre{}0 up\n".format(p))
+                    config.write("PostUp = ip link set gre{}0 master grebridge0\n".format(p))
+                    config.write("PostDown = ip link del gre{}0\n".format(p))
+                
+                config.write("PostUp = ip addr add {} dev grebridge0\n".format(local_peer["Address"][0]))
+                config.write("PostDown = ip link del grebridge0\n")
+
+                 
 
                 for key in INTERFACE_OPTIONAL_ATTRIBUTES:
                     if local_peer.get(key) is not None:
